@@ -3,6 +3,7 @@ package com.durand.create_pdf_from_any_xml_layout
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
@@ -20,6 +21,7 @@ import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -36,8 +38,32 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        askPermissions()
+        //checkStoragePermissions()
     }
+    private val STORAGE_PERMISSION_CODE = 100
+
+    fun checkStoragePermissions() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            // Solicitar el permiso de almacenamiento
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), STORAGE_PERMISSION_CODE)
+        } else {
+            // El permiso ya ha sido concedido, puedes proceder
+           // saveFileToExternalStorage()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == STORAGE_PERMISSION_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // El permiso fue concedido, puedes proceder
+                //saveFileToExternalStorage()
+            } else {
+                Toast.makeText(this, "Permiso de almacenamiento denegado", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,9 +82,74 @@ class MainActivity : AppCompatActivity() {
         shareToWSP!!.setOnClickListener(View.OnClickListener { shareWsp() })
     }
 
+    fun convertXmlToPdf() {
+        // Inflate the XML layout file
+        val view = LayoutInflater.from(this).inflate(R.layout.activity_main, null)
+        val displayMetrics = DisplayMetrics()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display!!.getRealMetrics(displayMetrics)
+        } else this.windowManager.defaultDisplay.getMetrics(displayMetrics)
+
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(displayMetrics.widthPixels, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(displayMetrics.heightPixels, View.MeasureSpec.EXACTLY)
+        )
+        Log.d("mylog", "Width Now " + view.measuredWidth)
+        view.layout(0, 0, displayMetrics.widthPixels, displayMetrics.heightPixels)
+        // Create a new PdfDocument instance
+        val document = PdfDocument()
+
+        // Obtain the width and height of the view
+        //int viewWidth = view.getMeasuredWidth();
+        //int viewHeight = view.getMeasuredHeight();
+        val viewWidth = 1080
+        val viewHeight = 1920
+        //Log.d("mylog", "Width: " + viewWidth);
+        // Create a PageInfo object specifying the page attributes
+        val pageInfo = PageInfo.Builder(viewWidth, viewHeight, 1).create()
+
+        // Start a new page
+        val page = document.startPage(pageInfo)
+
+        // Get the Canvas object to draw on the page
+        val canvas = page.canvas
+
+        // Create a Paint object for styling the view
+        val paint = Paint()
+        paint.color = Color.WHITE
+
+        // Draw the view on the canvas
+        view.draw(canvas)
+
+        // Finish the page
+        document.finishPage(page)
+
+        // Specify the path and filename of the output PDF file
+        val downloadsDir =
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val fileName = "example.pdf"
+        val filePath = File(downloadsDir, fileName)
+
+        try {
+            // Save the document to a file
+            val fos = FileOutputStream(filePath)
+            document.writeTo(fos)
+            document.close()
+            fos.close()
+            // PDF conversion successful
+            Toast.makeText(this, "XML to PDF Conversion Successful", Toast.LENGTH_LONG).show()
+        } catch (e: IOException) {
+            Log.d("josue", "hubo un error")
+            Log.d("josue", "e :$e")
+            e.printStackTrace()
+            // Error occurred while converting to PDF
+        }
+    }
+
     private fun shareWsp() {
         val downloadDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        val pdfFile = File(downloadDirectory, "exampleXML1.pdf")  // Asegúrate de que este archivo exista
+        val pdfFile = File(downloadDirectory, "example.pdf")  // Asegúrate de que este archivo exista
         sharePdfViaWhatsApp(pdfFile)
     }
 
@@ -120,71 +211,6 @@ class MainActivity : AppCompatActivity() {
             throw RuntimeException(e)
         } catch (e: IOException) {
             throw RuntimeException(e)
-        }
-    }
-
-    fun convertXmlToPdf() {
-        // Inflate the XML layout file
-        val view = LayoutInflater.from(this).inflate(R.layout.activity_main, null)
-        val displayMetrics = DisplayMetrics()
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            this.display!!.getRealMetrics(displayMetrics)
-        } else this.windowManager.defaultDisplay.getMetrics(displayMetrics)
-
-        view.measure(
-            View.MeasureSpec.makeMeasureSpec(displayMetrics.widthPixels, View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(displayMetrics.heightPixels, View.MeasureSpec.EXACTLY)
-        )
-        Log.d("mylog", "Width Now " + view.measuredWidth)
-        view.layout(0, 0, displayMetrics.widthPixels, displayMetrics.heightPixels)
-        // Create a new PdfDocument instance
-        val document = PdfDocument()
-
-        // Obtain the width and height of the view
-        //int viewWidth = view.getMeasuredWidth();
-        //int viewHeight = view.getMeasuredHeight();
-        val viewWidth = 1080
-        val viewHeight = 1920
-        //Log.d("mylog", "Width: " + viewWidth);
-        // Create a PageInfo object specifying the page attributes
-        val pageInfo = PageInfo.Builder(viewWidth, viewHeight, 1).create()
-
-        // Start a new page
-        val page = document.startPage(pageInfo)
-
-        // Get the Canvas object to draw on the page
-        val canvas = page.canvas
-
-        // Create a Paint object for styling the view
-        val paint = Paint()
-        paint.color = Color.WHITE
-
-        // Draw the view on the canvas
-        view.draw(canvas)
-
-        // Finish the page
-        document.finishPage(page)
-
-        // Specify the path and filename of the output PDF file
-        val downloadsDir =
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        val fileName = "exampleXML1.pdf"
-        val filePath = File(downloadsDir, fileName)
-
-        try {
-            // Save the document to a file
-            val fos = FileOutputStream(filePath)
-            document.writeTo(fos)
-            document.close()
-            fos.close()
-            // PDF conversion successful
-            Toast.makeText(this, "XML to PDF Conversion Successful", Toast.LENGTH_LONG).show()
-        } catch (e: IOException) {
-            Log.d("josue", "hubo un error")
-            Log.d("josue", "e :$e")
-            e.printStackTrace()
-            // Error occurred while converting to PDF
         }
     }
 
